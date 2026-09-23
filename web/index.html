@@ -1,0 +1,58 @@
+<!DOCTYPE html>
+<!-- ============================================================
+     ЗОНА НИКОНА: структура и классы.
+     Стили — web/styles.css (Костя). Логика — web/app.js (Никон).
+
+     Правило: класс, однажды попавший в разметку, не переименовывается
+     без предупреждения — иначе у Кости разъезжается вёрстка.
+     ============================================================ -->
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>HackAlem Starter</title>
+  <link rel="stylesheet" href="/styles.css">
+</head>
+<body>
+  <div class="wrap">
+    <header class="app-header">
+      <h1 class="app-title">HackAlem Starter</h1>
+      <span class="badge" id="mode">…</span>
+      <span class="badge" id="model"></span>
+    </header>
+    <p class="app-sub">Замените этот экран на основной сценарий вашего решения.</p>
+
+    <section class="card">
+      <h2 class="card__title">Генерация</h2>
+      <p class="hint">POST /api/generate/stream — потоковый ответ модели.</p>
+
+      <div class="field">
+        <label class="field__label" for="system">Системный промпт</label>
+        <input class="input" type="text" id="system"
+               value="Ты — полезный ассистент. Отвечай кратко и по делу.">
+      </div>
+
+      <div class="field">
+        <label class="field__label" for="prompt">Запрос</label>
+        <textarea class="textarea" id="prompt" rows="3"
+                  placeholder="Опишите, что нужно сгенерировать…"></textarea>
+      </div>
+
+      <div class="actions">
+        <button class="btn" id="go">Сгенерировать</button>
+        <button class="btn btn--ghost" id="save">Сохранить результат</button>
+      </div>
+
+      <pre class="output" id="out"></pre>
+    </section>
+
+    <section class="card">
+      <h2 class="card__title">Сохранённые результаты</h2>
+      <p class="hint">Данные переживают перезапуск: SQLite, таблица items.</p>
+      <ul class="list" id="items"></ul>
+    </section>
+  </div>
+
+  <script src="/app.js"></script>
+</body>
+</html>
