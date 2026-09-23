@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Загрузка данных · Граф денег</title>
+<script src="https://unpkg.com/vue@3/dist/vue.global.prod.js"></script>
+<style>
+:root{color-scheme:light;--bg:#f4f6fa;--panel:#fff;--line:#e3e8f0;--ink:#12213f;--muted:#6b7688;--accent:#0a57ff;--accent-hover:#0c46c4;--success:#16825d;--danger:#b42318;--sans:Inter,"Segoe UI",Arial,sans-serif}*{box-sizing:border-box}html,body,#app{min-height:100%;margin:0}body{background:linear-gradient(145deg,#f7f9fc,#e9eef6);color:var(--ink);font:14px/1.5 var(--sans)}button,input{font:inherit}.page{min-height:100vh;display:grid;place-items:center;padding:36px 20px}.shell{width:min(680px,100%)}.brand{display:inline-flex;align-items:center;gap:9px;margin-bottom:18px;padding:8px 13px;border:1px solid var(--line);border-radius:999px;background:rgba(255,255,255,.86);box-shadow:0 5px 18px rgba(24,44,78,.08);font-size:11px;font-weight:800;letter-spacing:.09em}.brand-mark{width:22px;height:22px;display:grid;place-items:center;border-radius:50%;background:#e8efff;color:var(--accent)}.card{overflow:hidden;border:1px solid var(--line);border-radius:18px;background:rgba(255,255,255,.94);box-shadow:0 22px 60px rgba(26,43,71,.12)}.head{padding:28px 30px 20px;border-bottom:1px solid var(--line)}h1{margin:0 0 7px;font-size:23px;line-height:1.25}.lead{margin:0;color:var(--muted);font-size:13px}.form{display:grid;gap:14px;padding:24px 30px 30px}.file-row{display:grid;grid-template-columns:160px minmax(0,1fr);align-items:center;gap:14px;padding:14px;border:1px solid var(--line);border-radius:11px;background:#f9fbfd}.file-meta strong{display:block;font-size:13px}.file-meta span{display:block;margin-top:3px;color:var(--muted);font-size:11px}.file-row input{width:100%;min-width:0;color:#45546b;font-size:12px}.file-row input::file-selector-button{margin-right:10px;padding:7px 10px;border:1px solid #d7deea;border-radius:7px;background:#fff;color:#30435f;cursor:pointer}.file-row input::file-selector-button:hover{border-color:#afbdd1}.actions{display:flex;align-items:center;gap:12px;margin-top:4px}.submit{min-height:42px;padding:0 18px;border:0;border-radius:9px;background:var(--accent);color:#fff;font-weight:750;cursor:pointer}.submit:hover:not(:disabled){background:var(--accent-hover)}.submit:disabled{opacity:.48;cursor:not-allowed}.privacy{margin-left:auto;color:var(--muted);font-size:11px;text-align:right}.progress{height:7px;overflow:hidden;border-radius:999px;background:#e7ebf2}.progress-bar{height:100%;width:0;border-radius:inherit;background:var(--accent);transition:width .18s ease}.progress.indeterminate .progress-bar{width:35%!important;animation:slide 1.15s ease-in-out infinite}@keyframes slide{from{transform:translateX(-110%)}to{transform:translateX(310%)}}.status{padding:13px 14px;border:1px solid var(--line);border-radius:9px;background:#f7f9fc;color:#526177;font-size:12px}.status.success{border-color:#b7dfd0;background:#edf8f3;color:var(--success)}.status.error{border-color:#f1c2bd;background:#fff3f2;color:var(--danger)}.result{display:flex;align-items:center;justify-content:space-between;gap:14px}.result strong{font-size:14px}.graph-link{display:inline-flex;align-items:center;justify-content:center;min-height:38px;padding:0 14px;border-radius:8px;background:var(--success);color:#fff;text-decoration:none;font-weight:700;white-space:nowrap}.back{display:inline-block;margin-top:15px;color:#526177;font-size:12px;text-decoration:none}.back:hover{color:var(--accent)}@media(max-width:600px){.page{padding:18px 12px}.head,.form{padding-left:18px;padding-right:18px}.file-row{grid-template-columns:1fr}.actions,.result{align-items:stretch;flex-direction:column}.privacy{text-align:left;margin:0}.submit,.graph-link{width:100%}}
+</style>
+</head>
+<body>
+<main id="app" class="page">
+  <div class="shell">
+    <div class="brand"><span class="brand-mark">⬡</span>ГРАФ ДЕНЕГ</div>
+    <section class="card">
+      <header class="head"><h1>Загрузка датасета</h1><p class="lead">Выберите три Parquet-файла. После загрузки сервер подготовит данные для просмотра графа.</p></header>
+      <form class="form" @submit.prevent="upload">
+        <label class="file-row"><span class="file-meta"><strong>Рёбра</strong><span>edges.parquet</span></span><input type="file" accept=".parquet,application/octet-stream" required :disabled="uploading" @change="setFile('edges',$event)"></label>
+        <label class="file-row"><span class="file-meta"><strong>Узлы</strong><span>nodes.parquet</span></span><input type="file" accept=".parquet,application/octet-stream" required :disabled="uploading" @change="setFile('nodes',$event)"></label>
+        <label class="file-row"><span class="file-meta"><strong>Транзакции</strong><span>transactions.parquet</span></span><input type="file" accept=".parquet,application/octet-stream" required :disabled="uploading" @change="setFile('transactions',$event)"></label>
+        <div class="actions"><button class="submit" type="submit" :disabled="!ready||uploading">{{uploading?'Загружаем…':'Загрузить и построить граф'}}</button><span class="privacy">Содержимое файлов не отображается и не записывается в журнал браузера.</span></div>
+        <div v-if="uploading" class="progress" :class="{indeterminate:progress===null}" role="progressbar" :aria-valuenow="progress" aria-valuemin="0" aria-valuemax="100"><div class="progress-bar" :style="{width:(progress??0)+'%'}"></div></div>
+        <div v-if="message" class="status" :class="resultType" role="status">
+          <div v-if="success" class="result"><strong>{{message}}</strong><a class="graph-link" href="graph.html">Перейти к графу →</a></div><span v-else>{{message}}</span>
+        </div>
+      </form>
+    </section>
+    <a class="back" href="graph.html">← Вернуться к графу</a>
+  </div>
+</main>
+<script>
+Vue.createApp({
+  data(){return{files:{edges:null,nodes:null,transactions:null},uploading:false,progress:0,message:'',resultType:'',success:false}},
+  computed:{ready(){return Object.values(this.files).every(Boolean)}},
+  methods:{
+    setFile(field,event){const input=event.target,file=input.files?.[0]||null;if(file&&!file.name.toLowerCase().endsWith('.parquet')){input.value='';this.files[field]=null;this.success=false;this.resultType='error';this.message='Выберите файл в формате .parquet.';return}this.files[field]=file;this.success=false;this.resultType='';this.message=''},
+    upload(){if(!this.ready||this.uploading)return;const body=new FormData;body.append('edges',this.files.edges);body.append('nodes',this.files.nodes);body.append('transactions',this.files.transactions);this.uploading=true;this.progress=0;this.success=false;this.resultType='';this.message='Загружаем файлы…';const xhr=new XMLHttpRequest;xhr.open('POST','/api/data/upload');xhr.upload.onprogress=event=>{this.progress=event.lengthComputable?Math.round(event.loaded/event.total*100):null};xhr.upload.onload=()=>{this.progress=100;this.message='Файлы загружены. Сервер строит граф…'};xhr.onerror=()=>this.finishError('Не удалось связаться с сервером. Проверьте, что API запущен, и повторите загрузку.');xhr.onabort=()=>this.finishError('Загрузка отменена.');xhr.onload=()=>{let data=xhr.response;try{if(typeof data==='string')data=JSON.parse(data)}catch{data=null}if(xhr.status>=200&&xhr.status<300&&data?.status==='ok'){this.uploading=false;this.progress=100;this.success=true;this.resultType='success';this.message=`Готово: ${Number(data.nodes)||0} узлов, ${Number(data.edges)||0} рёбер.`;return}this.finishError(data?.message||`Сервер не принял файлы${xhr.status?` (HTTP ${xhr.status})`:''}.`)};xhr.send(body)},
+    finishError(message){this.uploading=false;this.progress=0;this.success=false;this.resultType='error';this.message=message}
+  }
+}).mount('#app');
+</script>
+</body>
+</html>

@@ -5,14 +5,16 @@
 """
 from __future__ import annotations
 
+import logging
+import shutil
 from contextlib import asynccontextmanager
 from datetime import date
 from pathlib import Path
 from typing import Any, Literal
 
-from fastapi import FastAPI, HTTPException, Query
+from fastapi import FastAPI, File, HTTPException, Query, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, StreamingResponse
+from fastapi.responses import FileResponse, JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -25,9 +27,14 @@ from .responses import GraphJSONResponse
 graph_store = GraphStore()
 
 @asynccontextmanager
-async def lifespan(_: FastAPI):
+async def lifespan(application: FastAPI):
     db.init()
-    graph_store.load(config.DATA_DIR)
+    try:
+        graph_store.load(config.DATA_DIR)
+        application.state.data_ready = True
+    except Exception as exc:
+        application.state.data_ready = False
+        logging.warning("Данные графа не загружены при старте: %s", exc)
     yield
 
 
@@ -73,9 +80,44 @@ def health() -> dict[str, Any]:
         "demo_mode": config.DEMO_MODE,
         "model": config.MODEL,
         "graph_loaded": graph_store.analysis is not None,
+        "data_ready": bool(getattr(app.state, "data_ready", False)),
         "n_nodes": len(graph_store.nodes),
         **db.stats(),
     }
+
+
+@app.post("/api/data/upload")
+def upload_data(
+    edges: UploadFile = File(...),
+    nodes: UploadFile = File(...),
+    transactions: UploadFile = File(...),
+) -> Any:
+    uploads = {
+        "edges.parquet": edges,
+        "nodes.parquet": nodes,
+        "transactions.parquet": transactions,
+    }
+    try:
+        data_dir = Path(config.DATA_DIR)
+        data_dir.mkdir(parents=True, exist_ok=True)
+        for filename, upload in uploads.items():
+            upload.file.seek(0)
+            with (data_dir / filename).open("wb") as destination:
+                shutil.copyfileobj(upload.file, destination)
+        graph_store.load(data_dir)
+    except Exception as exc:
+        app.state.data_ready = False
+        logging.warning("Загрузка датасета завершилась ошибкой")
+        return JSONResponse(
+            status_code=400,
+            content={"status": "error", "message": str(exc)},
+        )
+
+    app.state.data_ready = True
+    n_nodes = len(graph_store.nodes)
+    n_edges = graph_store.graph.number_of_edges()
+    logging.info("Датасет загружен: %d узлов, %d рёбер", n_nodes, n_edges)
+    return {"status": "ok", "nodes": n_nodes, "edges": n_edges}
 
 
 @app.post("/api/generate")
