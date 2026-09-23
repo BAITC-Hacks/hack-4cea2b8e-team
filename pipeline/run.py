@@ -13,12 +13,12 @@ Must-have №1: один запуск от сырых .parquet до трёх в�
 from __future__ import annotations
 
 import argparse
+import json
 import time
 from pathlib import Path
 
-import pandas as pd
-
-from . import graph, roles
+from . import typologies
+from .analysis import analyze
 
 
 def main() -> None:
@@ -32,57 +32,27 @@ def main() -> None:
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
 
-    print("1/5 загрузка данных")
-    edges, nodes, tx = graph.load(args.data)
-    print(f"      узлов {len(nodes)}, рёбер {len(edges)}, транзакций {len(tx)}")
+    print("Расчёт графа, ролей, кластеров и типологий")
+    result = analyze(args.data)
+    g, m = result.network, result.nodes
+    print(f"Узлов {len(m)}, рёбер {len(result.edges)}, транзакций {len(result.transactions)}")
+    for name, table in result.tables(args.top).items():
+        table.to_csv(out / name, index=False)
+    top = result.top(max(args.top, 20))
 
-    print("2/5 метрики узлов")
-    g = graph.build_graph(edges)
-    m = graph.node_metrics(edges, nodes)
-    m = graph.add_components(m, g)
-
-    print("3/5 кластеризация")
-    m = graph.cluster(m, g)
-
-    print("4/5 роли и приоритеты")
-    m = roles.assign(m)
-    m = roles.priority(m)
-
-    print("5/5 выгрузки")
-    m[["gid", "role", "role_score", "cluster_id", "priority_score", "evidence"]].to_csv(
-        out / "nodes_roles.csv", index=False
-    )
-
-    cl = (
-        m.groupby("cluster_id")
-        .agg(
-            n_nodes=("gid", "count"),
-            n_seed=("is_seed", "sum"),
-            sum_kzt_internal=("sum_out", "sum"),
-        )
-        .reset_index()
-    )
-    cl["top_gids"] = cl.cluster_id.map(
-        lambda c: "|".join(
-            m[m.cluster_id == c].nlargest(5, "priority_score").gid.astype(str)
-        )
-    )
-    cl["hypothesis"] = cl.apply(
-        lambda r: f"Кластер из {r.n_nodes} узлов, {int(r.n_seed)} из исходного списка. "
-        f"Требует проверки как возможная группа.",
-        axis=1,
-    )
-    cl.to_csv(out / "clusters.csv", index=False)
-
-    top = m.nlargest(max(args.top, 20), "priority_score").reset_index(drop=True)
-    top.insert(0, "rank", top.index + 1)
-    top = top.rename(columns={"evidence": "why"})
-    top[["rank", "gid", "role", "priority_score", "why"]].to_csv(
-        out / "top_nodes.csv", index=False
+    # Устойчивость сети: что даст изъятие топ-N. Аргумент «начинать стоит с них».
+    res = typologies.resilience(g, top.gid.tolist())
+    (out / "resilience.json").write_text(
+        json.dumps(res, ensure_ascii=False, indent=2), encoding="utf-8"
     )
 
     print(f"\nГотово за {time.time() - t0:.1f} с. Файлы в {out}/")
     print(m.role.value_counts().to_string())
+    print(
+        f"\nИзъятие топ-{res['removed']}: компонент {res['components_before']} → "
+        f"{res['components_after']}, крупнейшая {res['largest_before']} → "
+        f"{res['largest_after']} (-{res['largest_drop_pct']}%)"
+    )
 
 
 if __name__ == "__main__":

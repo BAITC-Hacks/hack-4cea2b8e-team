@@ -22,6 +22,15 @@ import pandas as pd
 # см. scripts/explore.py. Здесь стартовые значения из описания данных в ТЗ.
 # ---------------------------------------------------------------------------
 THRESHOLDS = {
+    "collection_depth": 4,
+    "collection_min_amount": 5000,
+    "structuring_min_tx": 4,
+    "structuring_max_cv": 0.35,
+    "structuring_window_days": 7,
+    "passthrough_window_days": 2,
+    "passthrough_min_share": 0.7,
+    "sync_min_payers": 3,
+    "cycle_max_len": 4,
     "consolidator_min_payers": 8,      # в данных есть узлы с 8–24 плательщиками
     "consolidator_max_passthrough": 0.5,
     "distributor_min_receivers": 20,   # есть узлы с веером на 60–116 получателей
@@ -69,8 +78,8 @@ def classify(row: pd.Series, t: dict = THRESHOLDS) -> tuple[str, float, str]:
         )
 
     # Точка консолидации: много плательщиков, удерживает значимую часть.
-    if payers >= t["consolidator_min_payers"] and (
-        pt is None or pt <= t["consolidator_max_passthrough"]
+    if payers >= t["consolidator_min_payers"] and row.ratio_reliable and (
+        pt is not None and pt <= t["consolidator_max_passthrough"]
     ):
         held = f", дальше уходит {pt:.0%} полученного" if pt is not None else ""
         return (
@@ -110,7 +119,7 @@ def classify(row: pd.Series, t: dict = THRESHOLDS) -> tuple[str, float, str]:
             "terminal",
             0.75,
             f"Получил {_fmt(row.sum_in)} ₸ от {payers} плательщиков, дальше отправил "
-            f"{pt:.0%}. Средства остаются на узле.",
+            f"{pt:.0%} в пределах выборки. Возможный конечный получатель; полный баланс неизвестен.",
         )
 
     return (
@@ -142,11 +151,14 @@ def priority(m: pd.DataFrame) -> pd.DataFrame:
     }
     turnover = m.sum_in + m.sum_out
     norm = turnover / turnover.max() if turnover.max() else turnover
-    reach = (m.n_payers + m.n_receivers) / (m.n_payers + m.n_receivers).max()
+    connections = m.n_payers + m.n_receivers
+    reach = connections / connections.max() if connections.max() else connections
+
+    m["priority_role"] = 0.5 * m.role.map(role_weight).fillna(0.1)
+    m["priority_turnover"] = 0.3 * norm
+    m["priority_connections"] = 0.2 * reach
 
     m["priority_score"] = (
-        0.5 * m.role.map(role_weight).fillna(0.1)
-        + 0.3 * norm
-        + 0.2 * reach
+        m.priority_role + m.priority_turnover + m.priority_connections
     ).round(4)
     return m

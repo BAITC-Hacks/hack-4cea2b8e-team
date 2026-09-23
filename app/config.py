@@ -20,7 +20,8 @@ MODEL = os.getenv("MODEL", "gpt-4o-mini")
 DEMO_MODE = os.getenv("DEMO_MODE", "0") == "1" or not OPENAI_API_KEY
 
 # --- Приложение ---
-APP_NAME = os.getenv("APP_NAME", "HackAlem Starter")
+APP_NAME = os.getenv("APP_NAME", "Граф денег")
+DATA_DIR = Path(os.getenv("DATA_DIR", str(ROOT / "data")))
 HOST = os.getenv("HOST", "0.0.0.0")
 PORT = int(os.getenv("PORT", "8000"))
 DB_PATH = os.getenv("DB_PATH", str(ROOT / "data" / "app.db"))
