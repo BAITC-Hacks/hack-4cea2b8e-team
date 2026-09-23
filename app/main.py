@@ -7,6 +7,10 @@ from __future__ import annotations
 
 import logging
 import shutil
+import os
+import tempfile
+import threading
+from uuid import uuid4
 from contextlib import asynccontextmanager
 from datetime import date
 from pathlib import Path
@@ -26,12 +30,27 @@ from .responses import GraphJSONResponse
 from .summary import build_summary
 
 graph_store = GraphStore()
+upload_lock = threading.Lock()
+MAX_UPLOAD_BYTES = 100 * 1024 * 1024
+
+def active_data_dir() -> Path:
+    root = Path(config.DATA_DIR)
+    pointer = root / ".active-dataset"
+    if not pointer.exists():
+        return root
+    name = pointer.read_text(encoding="utf-8").strip()
+    if len(name) != 32 or any(c not in "0123456789abcdef" for c in name):
+        raise ValueError("Некорректный указатель активного датасета")
+    return root / ".uploads" / name
+
 
 @asynccontextmanager
 async def lifespan(application: FastAPI):
+    global graph_store
     db.init()
+    graph_store = GraphStore()
     try:
-        graph_store.load(config.DATA_DIR)
+        graph_store.load(active_data_dir())
         application.state.data_ready = True
     except Exception as exc:
         application.state.data_ready = False
@@ -46,6 +65,15 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.middleware("http")
+async def require_graph_data(request, call_next):
+    path = request.url.path
+    if (path.startswith("/api/")
+            and not path.startswith(("/api/health", "/api/data/upload", "/api/generate", "/api/items"))
+            and not getattr(app.state, "data_ready", False)):
+        return JSONResponse(status_code=503, content={"detail": "Сначала загрузите датасет через /upload.html"})
+    return await call_next(request)
 
 WEB_DIR = Path(__file__).resolve().parent.parent / "web"
 
@@ -93,32 +121,68 @@ def upload_data(
     nodes: UploadFile = File(...),
     transactions: UploadFile = File(...),
 ) -> Any:
-    uploads = {
-        "edges.parquet": edges,
-        "nodes.parquet": nodes,
-        "transactions.parquet": transactions,
-    }
+    global graph_store
+    uploads = {"edges.parquet": edges, "nodes.parquet": nodes,
+               "transactions.parquet": transactions}
+    if not upload_lock.acquire(blocking=False):
+        raise HTTPException(409, "Другой датасет уже обрабатывается. Повторите позже.")
+    staged: Path | None = None
+    pointer_tmp: Path | None = None
+    activated = False
     try:
-        data_dir = Path(config.DATA_DIR)
-        data_dir.mkdir(parents=True, exist_ok=True)
+        for upload in uploads.values():
+            if not (upload.filename or "").lower().endswith(".parquet"):
+                raise HTTPException(400, "Нужны три файла в формате .parquet")
+            if upload.size is not None and upload.size > MAX_UPLOAD_BYTES:
+                raise HTTPException(413, "Каждый файл должен быть не больше 100 МиБ")
+        root = Path(config.DATA_DIR)
+        versions = root / ".uploads"
+        versions.mkdir(parents=True, exist_ok=True)
+        staged = Path(tempfile.mkdtemp(prefix="staging-", dir=versions))
         for filename, upload in uploads.items():
             upload.file.seek(0)
-            with (data_dir / filename).open("wb") as destination:
-                shutil.copyfileobj(upload.file, destination)
-        graph_store.load(data_dir)
-    except Exception as exc:
-        app.state.data_ready = False
-        logging.warning("Загрузка датасета завершилась ошибкой")
-        return JSONResponse(
-            status_code=400,
-            content={"status": "error", "message": str(exc)},
-        )
-
-    app.state.data_ready = True
-    n_nodes = len(graph_store.nodes)
-    n_edges = graph_store.graph.number_of_edges()
-    logging.info("Датасет загружен: %d узлов, %d рёбер", n_nodes, n_edges)
-    return {"status": "ok", "nodes": n_nodes, "edges": n_edges}
+            size = 0
+            with (staged / filename).open("wb") as destination:
+                while chunk := upload.file.read(1024 * 1024):
+                    size += len(chunk)
+                    if size > MAX_UPLOAD_BYTES:
+                        raise HTTPException(413, "Каждый файл должен быть не больше 100 МиБ")
+                    destination.write(chunk)
+            if size == 0:
+                raise HTTPException(400, f"Файл {filename} пуст")
+        candidate = GraphStore()
+        try:
+            candidate.load(staged)
+        except Exception as exc:
+            raise HTTPException(400, f"Датасет не прошёл проверку: {exc}") from exc
+        # Опубликованные версии неизменяемы; прежние файлы остаются на месте.
+        version = uuid4().hex
+        committed = versions / version
+        staged.rename(committed)
+        staged = committed
+        pointer_tmp = root / (".active-dataset-" + version)
+        pointer_tmp.write_text(version, encoding="utf-8")
+        os.replace(pointer_tmp, root / ".active-dataset")
+        graph_store = candidate
+        activated = True
+        app.state.data_ready = True
+        return {"status": "ok", "nodes": len(candidate.nodes),
+                "edges": candidate.graph.number_of_edges(), "dataset_id": version}
+    except HTTPException as exc:
+        return JSONResponse(status_code=exc.status_code,
+                            content={"status": "error", "message": exc.detail})
+    except OSError:
+        logging.exception("Не удалось сохранить датасет")
+        return JSONResponse(status_code=500, content={"status": "error",
+                            "message": "Не удалось сохранить датасет; предыдущие данные сохранены."})
+    finally:
+        if staged is not None and not activated:
+            shutil.rmtree(staged, ignore_errors=True)
+        if pointer_tmp is not None:
+            pointer_tmp.unlink(missing_ok=True)
+        for upload in uploads.values():
+            upload.file.close()
+        upload_lock.release()
 
 
 @app.post("/api/generate")

@@ -1,0 +1,32 @@
+[
+  {
+    "file": "vue-3.5.22/vue.global.prod.js",
+    "source": "https://registry.npmjs.org/vue/-/vue-3.5.22.tgz",
+    "member": "package/dist/vue.global.prod.js",
+    "sha256": "dae9c178e86e09240e58721cdb46a81ac96ae1dc6a870d1b1bb9ffaee3c6d3fe"
+  },
+  {
+    "file": "vue-3.5.22/LICENSE",
+    "source": "https://registry.npmjs.org/vue/-/vue-3.5.22.tgz",
+    "member": "package/LICENSE",
+    "sha256": "1bb85cc9b13b81ef41c81c51866172fc345e0503c86726a6755b796590b70175"
+  },
+  {
+    "file": "vis-network-9.1.9/vis-network.min.js",
+    "source": "https://registry.npmjs.org/vis-network/-/vis-network-9.1.9.tgz",
+    "member": "package/standalone/umd/vis-network.min.js",
+    "sha256": "f53f833ddb9bf97efe856bb0637d4fe88f39e39999c7e94a4b8afc8de8a1a2e5"
+  },
+  {
+    "file": "vis-network-9.1.9/LICENSE-MIT",
+    "source": "https://registry.npmjs.org/vis-network/-/vis-network-9.1.9.tgz",
+    "member": "package/LICENSE-MIT",
+    "sha256": "1f65085e54c036645082257618db2c7b787e68c3b02485e214ecd09e0834ee8f"
+  },
+  {
+    "file": "vis-network-9.1.9/LICENSE-APACHE-2.0",
+    "source": "https://registry.npmjs.org/vis-network/-/vis-network-9.1.9.tgz",
+    "member": "package/LICENSE-APACHE-2.0",
+    "sha256": "1509904280a272780fd69c04b858f512cf216f8e3464a0dd98d8f34416feced9"
+  }
+]
