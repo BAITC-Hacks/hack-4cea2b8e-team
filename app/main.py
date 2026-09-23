@@ -23,6 +23,7 @@ from pipeline import typologies
 from . import config, db, llm
 from .graph_store import GraphStore
 from .responses import GraphJSONResponse
+from .summary import build_summary
 
 graph_store = GraphStore()
 
@@ -241,6 +242,13 @@ def overview() -> dict[str, Any]:
 def clusters() -> list[dict[str, Any]]:
     assert graph_store.analysis is not None
     return graph_store.analysis.clusters.to_dict("records")
+
+
+@app.get("/api/summary")
+def network_summary() -> dict[str, Any]:
+    """Роли, потоки и примеры по всей текущей выгрузке."""
+    assert graph_store.analysis is not None
+    return build_summary(graph_store.analysis)
 
 
 @app.get("/api/nodes")
