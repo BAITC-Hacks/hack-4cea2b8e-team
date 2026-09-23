@@ -176,7 +176,7 @@
     try {
       const response = await fetch('/api/summary');
       if (!response.ok) throw new Error('HTTP ' + response.status);
-      render(await response.json()); status.textContent = 'Сводка по данным, загруженным сервером. При замене исходных файлов перезапустите сервер.';
+      render(await response.json()); status.textContent = 'Сводка всей активной выгрузки. После загрузки нового набора в другой вкладке обновите страницу, чтобы обновить и граф.';
     } catch {
       if (!content.childElementCount) compact.textContent = 'Сводка недоступна. Нажмите «Обновить», чтобы повторить запрос.';
       status.className = 'summary-error';

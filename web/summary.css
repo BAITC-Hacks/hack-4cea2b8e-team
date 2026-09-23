@@ -56,3 +56,5 @@
   .summary-kpi, .summary-card, .summary-block { padding: 16px; }
   .summary-heading { flex-wrap: wrap; }
 }
+
+@media (max-width:700px) { .toolbar .icon-btn { width:23px; } .summary-jump { font-size:10px; padding:5px 6px; } }
