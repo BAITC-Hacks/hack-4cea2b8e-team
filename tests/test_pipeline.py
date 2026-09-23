@@ -123,3 +123,50 @@ def test_thresholds_documented(result):
     """Must-have 3: все пороги в одном месте и задокументированы."""
     assert roles.THRESHOLDS, "THRESHOLDS пуст"
     assert all(isinstance(v, (int, float)) for v in roles.THRESHOLDS.values())
+
+
+def test_summary_totals_and_links():
+    """Сводка сохраняет суммы и int64 gid, включая отсутствующие роли."""
+    from types import SimpleNamespace
+    from app.summary import build_summary
+    from app.responses import browser_ids
+
+    first, second = 100000000000000001, 100000000000000002
+    nodes = pd.DataFrame([
+        dict(gid=first, role="distributor", sum_in=0, sum_out=15000,
+             n_tx_in=0, n_tx_out=2, n_payers=0, n_receivers=1,
+             priority_score=0.8, evidence="Отправил 15 000 ₸"),
+        dict(gid=second, role="peripheral", sum_in=15000, sum_out=0,
+             n_tx_in=2, n_tx_out=0, n_payers=1, n_receivers=0,
+             priority_score=0.1, evidence="Получил 15 000 ₸"),
+    ])
+    edges = pd.DataFrame([dict(src=first, dst=second, sum_kzt=15000, n_tx=2)])
+    data = build_summary(SimpleNamespace(nodes=nodes, edges=edges, overview=lambda: {}))
+    assert sum(row["count"] for row in data["roles"]) == 2
+    assert sum(row["sum_in"] for row in data["roles"]) == 15000
+    assert sum(row["sum_out"] for row in data["roles"]) == 15000
+    assert sum(row["n_tx"] for row in data["role_flows"]) == 2
+    assert len(data["roles"]) == len(roles.ROLES)
+    assert len(data["examples"]) == 2
+    encoded = browser_ids(data)
+    edge = encoded["largest_transfers"][0]
+    assert edge["src"] == str(first) and edge["dst"] == str(second)
+    assert edge["sender_role"] == "distributor"
+    example = next(n for n in encoded["examples"] if n["role"] == "distributor")
+    assert example["outgoing"][0] == edge
+    assert example["incoming"] == []
+
+
+def test_summary_without_transfers():
+    """Пустой граф не создаёт вымышленных связей или участников."""
+    from types import SimpleNamespace
+    from app.summary import build_summary
+
+    columns = ["gid", "role", "sum_in", "sum_out", "n_tx_in", "n_tx_out"]
+    data = build_summary(SimpleNamespace(
+        nodes=pd.DataFrame(columns=columns),
+        edges=pd.DataFrame(columns=["src", "dst", "sum_kzt", "n_tx"]),
+        overview=lambda: {},
+    ))
+    assert all(row["count"] == 0 for row in data["roles"])
+    assert data["examples"] == data["largest_transfers"] == data["role_flows"] == []
