@@ -2,7 +2,7 @@ services:
   app:
     build: .
     ports:
-      - "8000:8000"
+      - "127.0.0.1:${GRAPH_PORT:-8000}:8000"
     environment:
       # Ключ подхватится из .env, если он есть; иначе — демо-режим.
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}

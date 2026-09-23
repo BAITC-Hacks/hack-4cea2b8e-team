@@ -20,8 +20,9 @@ LIMITATIONS = [
     "Связи и совпадение дат не доказывают движение одних и тех же денег; время внутри дня неизвестно.",
 ]
 
-NODE_COLUMNS = ["gid", "role", "role_score", "cluster_id", "priority_score", "evidence", "typologies"]
-TOP_COLUMNS = ["rank", "gid", "role", "priority_score", "why", "typologies"]
+NODE_COLUMNS = ["gid", "role", "role_score", "cluster_id", "priority_score", "evidence"]
+CLUSTER_COLUMNS = ["cluster_id", "n_nodes", "n_seed", "sum_kzt_internal", "top_gids", "hypothesis"]
+TOP_COLUMNS = ["rank", "gid", "role", "priority_score", "why"]
 
 
 @dataclass
@@ -39,14 +40,19 @@ class Analysis:
         top = self.ranked().head(limit).reset_index(drop=True).copy()
         top.insert(0, "rank", top.index + 1)
         top = top.rename(columns={"evidence": "why"})
-        return top[TOP_COLUMNS]
+        return top[TOP_COLUMNS + ["typologies"]]
 
-    def tables(self, limit: int = 25) -> dict[str, pd.DataFrame]:
-        return {
+    def tables(self, limit: int = 25, *, extended: bool = False) -> dict[str, pd.DataFrame]:
+        tables = {
             "nodes_roles.csv": self.nodes[NODE_COLUMNS],
-            "clusters.csv": self.clusters,
-            "top_nodes.csv": self.top(max(20, limit)),
+            "clusters.csv": self.clusters[CLUSTER_COLUMNS],
+            "top_nodes.csv": self.top(max(20, limit))[TOP_COLUMNS],
         }
+
+        if extended:
+            tables["nodes_roles_extended.csv"] = self.nodes[NODE_COLUMNS + ["typologies", "typology_evidence"]]
+            tables["top_nodes_extended.csv"] = self.top(max(20, limit))
+        return tables
 
     def overview(self) -> dict[str, Any]:
         tx = self.transactions

@@ -389,10 +389,11 @@ def node_flows(gid: int, direction: Literal["in", "out"] = "out",
 
 
 @app.get("/api/export/{filename}")
-def export_csv(filename: Literal["nodes_roles.csv", "clusters.csv", "top_nodes.csv"]) -> StreamingResponse:
+def export_csv(filename: Literal["nodes_roles.csv", "clusters.csv", "top_nodes.csv",
+                                 "nodes_roles_extended.csv", "top_nodes_extended.csv"]) -> StreamingResponse:
     """CSV в точности из результата, который видит аналитик в API."""
     assert graph_store.analysis is not None
-    csv = graph_store.analysis.tables()[filename].to_csv(index=False)
+    csv = graph_store.analysis.tables(extended=filename.endswith("_extended.csv"))[filename].to_csv(index=False)
     return StreamingResponse(iter([csv]), media_type="text/csv; charset=utf-8",
                              headers={"Content-Disposition": f'attachment; filename="{filename}"'})
 
@@ -413,7 +414,7 @@ def graph_page() -> FileResponse:
 
 @app.get("/")
 def index() -> FileResponse:
-    return FileResponse(WEB_DIR / "index.html")
+    return FileResponse(WEB_DIR / "graph.html")
 
 
 app.mount("/", StaticFiles(directory=WEB_DIR), name="web")

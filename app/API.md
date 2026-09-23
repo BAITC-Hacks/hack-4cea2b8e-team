@@ -22,7 +22,7 @@ uvicorn app.main:app --host 127.0.0.1 --port 8000
 Машинная спецификация: `GET /openapi.json`.
 
 Экран Кости: `http://localhost:8000/graph` (также `/graph.html`).
-Старый стартовый экран пока остаётся на `/`.
+Главная страница `/` также открывает граф.
 
 ## Совместимость с фронтендом Кости
 
@@ -89,7 +89,7 @@ Vue 3.5.22 и vis-network 9.1.9 поставляются локально в `we
 | `GET /api/path` | `source`, `target`, `max_hops=6` от 1 до 10; `{source, target, found, gids, nodes, edges, max_hops, interpretation}` |
 | `POST /api/common-receivers` | JSON `{"gids": [123, 456], "limit": 50}`; 2–20 разных узлов, `limit` до 200; `{gids, total, items, truncated, hops: 1}` |
 | `GET /api/resilience` | `top=10`, от 1 до 100; размер крупнейшей компоненты и число компонент до/после удаления топа, `gids`, `interpretation` |
-| `GET /api/export/{filename}` | `nodes_roles.csv`, `clusters.csv` или `top_nodes.csv`; файл CSV для скачивания |
+| `GET /api/export/{filename}` | `nodes_roles.csv`, `clusters.csv`, `top_nodes.csv` — точная схема ТЗ; `nodes_roles_extended.csv`, `top_nodes_extended.csv` — отдельные расширенные CSV |
 
 Фильтры `/api/nodes` и `/api/graph`: `role`, `cluster_id`, `is_seed`,
 `truncated`, `min_priority` от 0 до 1, `typology`. Совместно применяются через
@@ -273,3 +273,17 @@ Vue 3.5.22 и vis-network 9.1.9 поставляются локально в `we
 После стабилизации координаты фиксируются, физика выключается.
 При выборе другого клиента загружается его новое окружение и сбрасываются
 фильтры: наличие клиента в старом подграфе не означает полноту его связей.
+
+## Точная схема CSV для сдачи
+
+`nodes_roles.csv`: `gid,role,role_score,cluster_id,priority_score,evidence`.
+`clusters.csv`: `cluster_id,n_nodes,n_seed,sum_kzt_internal,top_gids,hypothesis`.
+`top_nodes.csv`: `rank,gid,role,priority_score,why`.
+
+Типологии исключены только из обязательных CSV. `nodes_roles_extended.csv`
+содержит их колонки плюс `typologies,typology_evidence`; `top_nodes_extended.csv`
+содержит поля топа плюс `typologies`. Все пять файлов доступны через
+`/api/export/{filename}`. CLI добавляет расширенные файлы по флагу `--extended`.
+JSON API продолжает отдавать типологии для карточек и фильтров.
+Проверки схемы выполняются через реальный запуск CLI и HTTP-экспорт;
+после этой правки полный набор содержит 20 тестов.

@@ -64,10 +64,12 @@ def test_result_survives_reload(client):
 
 
 def test_frontend_is_served(client):
-    """Главная страница отдаётся и подключает стили и скрипт."""
-    html = client.get("/").text
-    assert "styles.css" in html
-    assert "app.js" in html
+    """Корень сайта открывает экран расследования с формой загрузки."""
+    response = client.get("/")
+    assert response.status_code == 200
+    assert response.text == client.get("/graph.html").text
+    assert 'id="network"' in response.text
+    assert 'href="/upload.html"' in response.text
 
 
 # --------------------------------------------------------------------------

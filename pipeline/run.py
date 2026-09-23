@@ -26,6 +26,7 @@ def main() -> None:
     ap.add_argument("--data", default="data", help="папка с edges/nodes/transactions.parquet")
     ap.add_argument("--out", default="out", help="куда положить выгрузки")
     ap.add_argument("--top", type=int, default=25, help="размер топ-листа (минимум 20)")
+    ap.add_argument("--extended", action="store_true", help="добавить отдельные CSV с типологиями")
     args = ap.parse_args()
 
     t0 = time.time()
@@ -36,7 +37,7 @@ def main() -> None:
     result = analyze(args.data)
     g, m = result.network, result.nodes
     print(f"Узлов {len(m)}, рёбер {len(result.edges)}, транзакций {len(result.transactions)}")
-    for name, table in result.tables(args.top).items():
+    for name, table in result.tables(args.top, extended=args.extended).items():
         table.to_csv(out / name, index=False)
     top = result.top(max(args.top, 20))
 
